@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>뉴스 관리자 페이지</title>
+  <style>
+    /* 1. 색상 변수 정의 (기본 라이트 모드) */
+    :root {
+      --bg-color: #ffffff;
+      --text-color: #333333;
+      --input-bg: #ffffff;
+      --input-border: #cccccc;
+      --border-color: #dddddd;
+      --btn-bg: #000000;
+      --btn-text: #ffffff;
+      --cancel-btn-bg: #666666;
+    }
+
+    /* 2. 다크 모드 색상 정의 */
+    body.dark-mode {
+      --bg-color: #1e1e1e;
+      --text-color: #e0e0e0;
+      --input-bg: #2d2d2d;
+      --input-border: #555555;
+      --border-color: #444444;
+      --btn-bg: #e0e0e0;
+      --btn-text: #000000;
+      --cancel-btn-bg: #888888;
+    }
+
+    body { 
+      font-family: sans-serif; 
+      padding: 20px; 
+      max-width: 600px; 
+      margin: auto; 
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      transition: background-color 0.3s, color 0.3s;
+    }
+    
+    .header-flex { display: flex; justify-content: space-between; align-items: center; }
+    
+    input, textarea { 
+      width: 100%; 
+      margin-bottom: 10px; 
+      padding: 8px; 
+      box-sizing: border-box; 
+      background-color: var(--input-bg);
+      color: var(--text-color);
+      border: 1px solid var(--input-border);
+    }
+    input::placeholder, textarea::placeholder { color: #999; }
+    
+    button { 
+      padding: 10px 15px; 
+      background: var(--btn-bg); 
+      color: var(--btn-text); 
+      border: none; 
+      cursor: pointer; 
+      margin-right: 5px; 
+      border-radius: 4px;
+    }
+    #cancel-btn { background: var(--cancel-btn-bg); color: #fff; }
+    #theme-toggle { background: transparent; color: var(--text-color); border: 1px solid var(--border-color); font-size: 0.9em; padding: 5px 10px; }
+
+    .article-item { border: 1px solid var(--border-color); padding: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+    .article-item h4 { margin: 0; font-size: 1em; }
+    .edit-btn { background: #0056b3; color: white; padding: 5px 10px; font-size: 0.9em; }
+    .delete-btn { background: #dc3545; color: white; padding: 5px 10px; font-size: 0.9em; }
+  </style>
+
+  <script>
+    if (localStorage.getItem('theme') === 'dark') {
+      document.documentElement.classList.add('dark-mode');
+    }
+  </script>
+</head>
+<body class="light-mode">
+  <div class="header-flex">
+    <h1>뉴스 관리자</h1>
+    <button id="theme-toggle">🌙 다크 모드</button>
+  </div>
+  
+  <div id="login-section">
+    <input type="email" id="email" placeholder="이메일 (202620618@ydp.hs.kr)">
+    <input type="password" id="password" placeholder="비밀번호">
+    <button id="login-btn">로그인</button>
+  </div>
+
+  <div id="admin-panel" style="display: none;">
+    <div id="editor-section">
+      <h3 id="editor-header">새 기사 작성</h3>
+      <input type="text" id="title" placeholder="기사 제목">
+      <input type="text" id="imgur-url" placeholder="Imgur 이미지 링크 (예: https://i.imgur.com/abc.jpg)">
+      <input type="text" id="image-caption" placeholder="사진 설명 (선택 사항)">
+      <textarea id="content" placeholder="기사 본문" rows="10"></textarea>
+      <button id="submit-btn">기사 발행</button>
+      <button id="cancel-btn" style="display: none;">수정 취소</button>
+    </div>
+
+    <hr style="margin: 30px 0; border-color: var(--border-color);">
+
+    <div id="list-section">
+      <h3>기사 목록 (수정 / 삭제)</h3>
+      <div id="article-list">목록을 불러오는 중...</div>
+    </div>
+  </div>
+
+  <script>
+    const themeToggleBtn = document.getElementById('theme-toggle');
+    const body = document.body;
+
+    // 초기 버튼 텍스트 설정
+    if (localStorage.getItem('theme') === 'dark') {
+      body.classList.add('dark-mode');
+      themeToggleBtn.innerText = '☀️ 라이트 모드';
+    }
+
+    themeToggleBtn.addEventListener('click', () => {
+      body.classList.toggle('dark-mode');
+      if (body.classList.contains('dark-mode')) {
+        localStorage.setItem('theme', 'dark');
+        themeToggleBtn.innerText = '☀️ 라이트 모드';
+      } else {
+        localStorage.setItem('theme', 'light');
+        themeToggleBtn.innerText = '🌙 다크 모드';
+      }
+    });
+  </script>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-analytics.js";
+    import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+    import { getFirestore, collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyD4cQL2Y8VnLUny8gQrTbFZ6-capYJcsHA",
+      authDomain: "houjwaa.firebaseapp.com",
+      projectId: "houjwaa",
+      storageBucket: "houjwaa.firebasestorage.app",
+      messagingSenderId: "205187324578",
+      appId: "1:205187324578:web:e5fc6dde62704a7267d5fb",
+      measurementId: "G-XVY99GM0C9"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const analytics = getAnalytics(app);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    let editingId = null; 
+    let articlesData = {}; 
+
+    // 로그인 상태 확인
+    onAuthStateChanged(auth, (user) => {
+      if (user && user.email === "202620618@ydp.hs.kr") {
+        document.getElementById('login-section').style.display = 'none';
+        document.getElementById('admin-panel').style.display = 'block';
+        loadArticles(); 
+      }
+    });
+
+    document.getElementById('login-btn').addEventListener('click', () => {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      signInWithEmailAndPassword(auth, email, password)
+        .then(() => alert("로그인 성공!"))
+        .catch((error) => alert("로그인 실패: " + error.message));
+    });
+
+    // 기사 목록 불러오기
+    async function loadArticles() {
+      const listEl = document.getElementById('article-list');
+      listEl.innerHTML = '로딩 중...';
+      
+      const q = query(collection(db, "articles"), orderBy("createdAt", "desc"));
+      const snapshot = await getDocs(q);
+      
+      listEl.innerHTML = '';
+      articlesData = {};
+
+      if (snapshot.empty) {
+        listEl.innerHTML = '<p>등록된 기사가 없습니다.</p>';
+        return;
+      }
+
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        articlesData[docSnap.id] = data; 
+
+        const div = document.createElement('div');
+        div.className = 'article-item';
+        div.innerHTML = `
+          <h4>${data.title}</h4>
+          <div>
+            <button class="edit-btn" data-id="${docSnap.id}">수정</button>
+            <button class="delete-btn" data-id="${docSnap.id}">삭제</button>
+          </div>
+        `;
+        listEl.appendChild(div);
+      });
+
+      // 수정 버튼 이벤트
+      document.querySelectorAll('.edit-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const id = e.target.getAttribute('data-id');
+          const data = articlesData[id];
+          
+          editingId = id;
+          document.getElementById('title').value = data.title;
+          document.getElementById('imgur-url').value = data.imgurUrl || '';
+          // 사진 설명 데이터 불러오기 추가
+          document.getElementById('image-caption').value = data.imageCaption || '';
+          document.getElementById('content').value = data.content;
+          
+          document.getElementById('editor-header').innerText = "기사 수정";
+          document.getElementById('submit-btn').innerText = "수정 완료";
+          document.getElementById('cancel-btn').style.display = "inline-block";
+          
+          window.scrollTo(0, 0); 
+        });
+      });
+
+      // 삭제 버튼 이벤트
+      document.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const id = e.target.getAttribute('data-id');
+          if (confirm("정말 이 기사를 삭제하시겠습니까?")) {
+            try {
+              await deleteDoc(doc(db, "articles", id));
+              alert("기사가 삭제되었습니다.");
+              if (editingId === id) resetForm();
+              loadArticles(); 
+            } catch (error) {
+              alert("삭제 중 오류가 발생했습니다: " + error.message);
+            }
+          }
+        });
+      });
+    }
+
+    // 폼 초기화 함수
+    function resetForm() {
+      editingId = null;
+      document.getElementById('title').value = '';
+      document.getElementById('imgur-url').value = '';
+      // 사진 설명 초기화 추가
+      document.getElementById('image-caption').value = '';
+      document.getElementById('content').value = '';
+      document.getElementById('editor-header').innerText = "새 기사 작성";
+      document.getElementById('submit-btn').innerText = "기사 발행";
+      document.getElementById('cancel-btn').style.display = "none";
+    }
+
+    document.getElementById('cancel-btn').addEventListener('click', resetForm);
+
+    // 기사 발행 및 수정 로직
+    document.getElementById('submit-btn').addEventListener('click', async () => {
+      const title = document.getElementById('title').value;
+      const imgurUrl = document.getElementById('imgur-url').value;
+      // 사진 설명 값 가져오기 추가
+      const imageCaption = document.getElementById('image-caption').value;
+      const content = document.getElementById('content').value;
+
+      if(!title || !content) return alert("제목과 내용을 입력하세요.");
+
+      try {
+        if (editingId) {
+          const docRef = doc(db, "articles", editingId);
+          await updateDoc(docRef, {
+            title: title,
+            imgurUrl: imgurUrl,
+            imageCaption: imageCaption, // 추가
+            content: content,
+            updatedAt: serverTimestamp() 
+          });
+          alert("기사가 성공적으로 수정되었습니다!");
+        } else {
+          await addDoc(collection(db, "articles"), {
+            title: title,
+            imgurUrl: imgurUrl,
+            imageCaption: imageCaption, // 추가
+            content: content,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          });
+          alert("기사가 성공적으로 발행되었습니다!");
+        }
+        
+        resetForm();
+        loadArticles(); 
+      } catch (e) {
+        alert("처리 중 에러: " + e.message);
+      }
+    });
+  </script>
+</body>
+</html>

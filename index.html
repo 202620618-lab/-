@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="referrer" content="no-referrer"> 
+  <meta property="og:title" id="og-title" content="호좌뉴스">
+  <meta property="og:description" id="og-desc" content="가장 병맛의 소식을 전달합니다.">
+  <meta property="og:image" id="og-image" content="https://i.imgur.com/기본이미지.jpg">
+  <title>호좌News</title>
+  
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+  <style>
+    :root {
+      --bg-color: #ffffff;
+      --text-color: #333333;
+      --header-border: #333333;
+      --link-color: #000000;
+      --link-hover: #0056b3;
+      --meta-color: #888888;
+      --item-border: #dddddd;
+      --quote-bg: #f9f9f9;
+    }
+
+    body.dark-mode {
+      --bg-color: #121212;
+      --text-color: #e0e0e0;
+      --header-border: #666666;
+      --link-color: #90caf9;
+      --link-hover: #64b5f6;
+      --meta-color: #aaaaaa;
+      --item-border: #333333;
+      --quote-bg: #2d2d2d;
+    }
+
+    body { 
+      font-family: 'Malgun Gothic', sans-serif; 
+      max-width: 800px; 
+      margin: 0 auto; 
+      padding: 20px; 
+      line-height: 1.7; 
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .header { 
+      border-bottom: 2px solid var(--header-border); 
+      padding-bottom: 10px; 
+      margin-bottom: 20px; 
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .header h1 { margin: 0; cursor: pointer; font-size: 1.5em; }
+    
+    #theme-toggle {
+      background: none;
+      border: 1px solid var(--meta-color);
+      color: var(--text-color);
+      padding: 5px 10px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 0.9em;
+    }
+
+    .article-item { border-bottom: 1px solid var(--item-border); padding: 15px 0; }
+    .article-item h2 { margin: 0 0 10px 0; font-size: 1.2em; }
+    .article-item a { text-decoration: none; color: var(--link-color); transition: color 0.2s; }
+    .article-item a:hover { text-decoration: underline; color: var(--link-hover); }
+    
+    .meta { color: var(--meta-color); font-size: 0.9em; margin-bottom: 15px; }
+    
+    /* 사진 및 회색 설명 스타일 */
+    .article-img { max-width: 100%; height: auto; margin: 20px auto 5px; display: block; border-radius: 5px; }
+    .image-caption { text-align: center; color: var(--meta-color); font-size: 0.85em; margin-bottom: 30px; }
+
+    /* 마크다운 본문 스타일링 */
+    #markdown-content { font-size: 1.05em; }
+    #markdown-content h1, #markdown-content h2, #markdown-content h3 { margin-top: 1.5em; margin-bottom: 0.5em; }
+    #markdown-content blockquote { 
+      border-left: 4px solid var(--meta-color); 
+      padding-left: 15px; 
+      color: var(--meta-color); 
+      background: var(--quote-bg);
+      margin: 20px 0;
+      padding: 10px 20px;
+    }
+    #markdown-content code { background: var(--quote-bg); padding: 2px 5px; border-radius: 3px; font-family: monospace; }
+    #markdown-content img { max-width: 100%; height: auto; border-radius: 5px; }
+    #markdown-content ul, #markdown-content ol { padding-left: 20px; }
+  </style>
+
+  <script>
+    if (localStorage.getItem('theme') === 'dark') {
+      document.documentElement.classList.add('dark-mode');
+    }
+  </script>
+</head>
+<body>
+  <div class="header">
+    <h1 onclick="location.href='index.html'">📰 오늘의 호좌뉴스</h1>
+    <button id="theme-toggle">🌙 다크 모드</button>
+  </div>
+
+  <div id="content-area">
+    <p>뉴스를 불러오는 중입니다...</p>
+  </div>
+
+  <script>
+    const themeToggleBtn = document.getElementById('theme-toggle');
+    const body = document.body;
+
+    if (localStorage.getItem('theme') === 'dark') {
+      body.classList.add('dark-mode');
+      themeToggleBtn.innerText = '☀️ 라이트 모드';
+    }
+
+    themeToggleBtn.addEventListener('click', () => {
+      body.classList.toggle('dark-mode');
+      if (body.classList.contains('dark-mode')) {
+        localStorage.setItem('theme', 'dark');
+        themeToggleBtn.innerText = '☀️ 라이트 모드';
+      } else {
+        localStorage.setItem('theme', 'light');
+        themeToggleBtn.innerText = '🌙 다크 모드';
+      }
+    });
+  </script>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-analytics.js";
+    import { getFirestore, collection, getDocs, doc, getDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyD4cQL2Y8VnLUny8gQrTbFZ6-capYJcsHA",
+      authDomain: "houjwaa.firebaseapp.com",
+      projectId: "houjwaa",
+      storageBucket: "houjwaa.firebasestorage.app",
+      messagingSenderId: "205187324578",
+      appId: "1:205187324578:web:e5fc6dde62704a7267d5fb",
+      measurementId: "G-XVY99GM0C9"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const analytics = getAnalytics(app);
+    const db = getFirestore(app);
+    const contentArea = document.getElementById('content-area');
+
+    function formatDate(timestamp) {
+      if (!timestamp) return '';
+      const date = timestamp.toDate();
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const articleId = urlParams.get('id');
+
+    if (articleId) {
+      const docRef = doc(db, "articles", articleId);
+      getDoc(docRef).then((docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          
+          // 사진 설명 로직 포함
+          let imgHtml = '';
+          if (data.imgurUrl) {
+            imgHtml = `<img src="${data.imgurUrl}" class="article-img" alt="기사 이미지">`;
+            if (data.imageCaption) {
+              imgHtml += `<div class="image-caption">${data.imageCaption}</div>`;
+            }
+          }
+
+          // 마크다운 파싱 (Marked.js 사용)
+          const markdownHtml = marked.parse(data.content || "");
+          
+          document.title = data.title + " - 호좌News";
+          document.getElementById('og-title').setAttribute('content', data.title);
+          
+          const descSnippet = data.content ? data.content.substring(0, 80).replace(/\n/g, ' ') + '...' : "기사 본문을 확인하세요.";
+          document.getElementById('og-desc').setAttribute('content', descSnippet);
+          
+          if (data.imgurUrl) {
+            document.getElementById('og-image').setAttribute('content', data.imgurUrl);
+          }
+
+          contentArea.innerHTML = `
+            <h2>${data.title}</h2>
+            <div class="meta">입력: ${formatDate(data.createdAt)} | 수정: ${formatDate(data.updatedAt)}</div>
+            ${imgHtml}
+            <div id="markdown-content">${markdownHtml}</div>
+          `;
+        } else {
+          contentArea.innerHTML = "<p>기사를 찾을 수 없습니다.</p>";
+        }
+      });
+    } else {
+      const q = query(collection(db, "articles"), orderBy("createdAt", "desc"));
+      getDocs(q).then((querySnapshot) => {
+        contentArea.innerHTML = '';
+        querySnapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          contentArea.innerHTML += `
+            <div class="article-item">
+              <h2><a href="?id=${docSnap.id}">${data.title}</a></h2>
+              <div class="meta">${formatDate(data.createdAt)}</div>
+            </div>
+          `;
+        });
+        if(querySnapshot.empty) contentArea.innerHTML = '<p>등록된 기사가 없습니다.</p>';
+      });
+    }
+  </script>
+</body>
+</html>

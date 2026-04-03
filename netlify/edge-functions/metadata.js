@@ -9,7 +9,7 @@ export default async (request, context) => {
   // 봇이면서 기사 ID가 있는 경우에만 처리
   if (isBot && articleId) {
     // Firebase에서 직접 데이터를 가져오기 (Fetch API 사용)
-    const firebaseProject = "betear-3915d"; // 본인 프로젝트 ID
+    const firebaseProject = "houjwaa"; // 본인 프로젝트 ID
     const dbUrl = `https://firestore.googleapis.com/v1/projects/${firebaseProject}/databases/(default)/documents/articles/${articleId}`;
     
     try {
